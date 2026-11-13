@@ -1,0 +1,13 @@
+{
+  "service_host": "www.shop.test",
+  "require_secure": true,
+  "require_https_only_prefixes": true,
+  "max_name_bytes": 64,
+  "max_value_bytes": 256,
+  "max_header_bytes": 512,
+  "allowed_samesite": [
+    "Strict",
+    "Lax",
+    "None"
+  ]
+}

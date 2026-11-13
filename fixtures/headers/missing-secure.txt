@@ -1,0 +1,1 @@
+sid=abc123; Path=/; HttpOnly; SameSite=Lax
