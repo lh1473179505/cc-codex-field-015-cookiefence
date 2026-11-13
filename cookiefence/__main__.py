@@ -27,14 +27,17 @@ def _read_header(value: str) -> str:
     if value.startswith("@"):
         text = Path(value[1:]).read_text(encoding="utf-8")
     else:
+        path = Path(value)
+        # A literal header can itself contain characters that are not legal
+        # in a filesystem path; only treat the value as a file when the
+        # filesystem can actually resolve it as one.
         try:
-            path = Path(value)
-            if path.is_file():
-                text = path.read_text(encoding="utf-8")
-            else:
-                return value
+            is_file = path.is_file()
         except OSError:
+            is_file = False
+        if not is_file:
             return value
+        text = path.read_text(encoding="utf-8")
     if text.endswith("\r\n"):
         return text[:-2]
     if text.endswith("\n"):
@@ -50,8 +53,8 @@ def main(argv: list[str] | None = None) -> int:
         print(f"failed to read header: {exc}", file=sys.stderr)
         return 2
 
-    parsed = parse_set_cookie(raw)
     if args.cmd == "inspect":
+        parsed = parse_set_cookie(raw)
         print(json.dumps(parsed_to_dict(parsed), ensure_ascii=False, indent=2))
         return 0
     if args.cmd == "validate":
@@ -61,14 +64,10 @@ def main(argv: list[str] | None = None) -> int:
             print(f"failed to load policy: {exc}", file=sys.stderr)
             return 2
         from cookiefence.engine import validate_set_cookie
-        try:
-            report = validate_set_cookie(parsed, policy)
-        except NotImplementedError as exc:
-            print(str(exc), file=sys.stderr)
-            return 2
-        except Exception as exc:
-            print(f"validate failed unexpectedly: {exc}", file=sys.stderr)
-            return 2
+        # Anything that can be read as a string still gets a deny report,
+        # even if the parser cannot split it into a name/value pair.
+        parsed = parse_set_cookie(raw)
+        report = validate_set_cookie(parsed, policy)
         Path(args.report).parent.mkdir(parents=True, exist_ok=True)
         Path(args.report).write_text(json.dumps(report, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
         decision = str(report.get("decision", "")).lower()
